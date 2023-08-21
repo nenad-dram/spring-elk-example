@@ -1,0 +1,61 @@
+services:
+  user-service:
+    build: $PWD/user-service
+    image: sample-elk/user-service
+    container_name: user-service-elk
+    depends_on:
+      - elasticsearch
+    ports:
+      - 8080:8080
+    volumes:
+      - user_logs:/user/logs
+
+  elasticsearch:
+    image: elasticsearch:8.8.1
+    container_name: elasticsearch
+    ports:
+      - 9200:9200
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+  
+  logstash:
+    image: logstash:8.8.1
+    container_name: logstash
+    depends_on:
+      - elasticsearch
+    ports:
+      - 5044:5044
+    configs:
+      - source: ls_config
+        target: /usr/share/logstash/pipeline/logstash.conf
+  
+  filebeat:
+    depends_on:
+      - logstash
+    image: docker.elastic.co/beats/filebeat:8.8.1
+    container_name: filebeat
+    user: root
+    volumes:
+      - user_logs:/usr/share/filebeat/user-logs:ro
+    configs:
+      - source: fb_config
+        target: /usr/share/filebeat/filebeat.yml
+
+  kibana:
+    image: kibana:8.8.1
+    container_name: kibana
+    depends_on:
+      - elasticsearch
+    ports:
+      - 5601:5601
+
+volumes:
+  user_logs:
+
+configs:
+  fb_config:
+    file: $PWD/filebeat.yml
+  ls_config:
+    file: $PWD/logstash.conf

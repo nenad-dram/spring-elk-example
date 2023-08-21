@@ -1,0 +1,54 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.1.1'
+    id 'io.spring.dependency-management' version '1.1.0'
+}
+
+group = 'com.endyary'
+version = '0.0.1-SNAPSHOT'
+def dockerImageName = "sample-elk/${rootProject.name}"
+
+java {
+    sourceCompatibility = '17'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    compileOnly 'org.projectlombok:lombok:1.18.28'
+    annotationProcessor 'org.projectlombok:lombok:1.18.28'
+
+    testCompileOnly 'org.projectlombok:lombok:1.18.28'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.28'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.register('extractBootJar', Copy) {
+    dependsOn bootJar
+    def zipFile = file("${buildDir}/libs/${rootProject.name}-${version}.jar")
+    def outputDir = file("${buildDir}/layers")
+
+    from zipTree(zipFile)
+    into outputDir
+}
+
+tasks.register('dockerBuild') {
+    dependsOn tasks.named("extractBootJar")
+    println dockerImageName
+    doLast {
+        exec {
+            commandLine "sh", "-c", "(docker rm ${dockerImageName} || true) " +
+                    "&& (docker rmi ${dockerImageName} || true)" +
+                    "&& docker build -t ${dockerImageName} ."
+        }
+    }
+}
